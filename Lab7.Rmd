@@ -5,25 +5,99 @@ date: "2023-04-05"
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(haven)
+library(sandwich)
+library(rdrobust)
+library(rpart)
+library(randomForest)
+training <- read_dta("atlas_training.dta")
+lockbox <- read_dta("atlas_lockbox.dta")
+view(training)
+view(lockbox)
+
 ```
 
-## R Markdown
+```{r q1}
+#Demonstrating convergence in incomes across racial groups using all-race/gender model
+#set seed
+HUID <- 21519588 
+set.seed(HUID)
 
-This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+#Demonstrating model across two generations
+#Gen 1-2
+parents_rank <- 57.9
+kids_rank <- 33.31 + 0.351 * parents_rank
+kids_rank
 
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+#Gen 2-3
+parents_rank = kids_rank
+kids_rank = 33.31 + 0.351 * parents_rank
+kids_rank
 
-```{r cars}
-summary(cars)
+#Iterating across multiple generations
+generations <- seq(1,7,1)
+
+parents_rank_white = 57.9
+parents_rank_black = 32.7
+
+#white gen for loop
+for(i in generations){ 
+  kids_rank <- 33.31 + 0.351 * parents_rank_white
+  print(paste0("In generation ", i, ", parent_rank = ", parents_rank_white, ", child_rank = ", kids_rank))
+  parents_rank_white <- kids_rank
+}
+
+#black gen for loop
+for(i in generations){ 
+  kids_rank <- 33.31 + 0.351 * parents_rank_black
+  print(paste0("In generation ", i, ", parent_rank = ", parents_rank_black, ", child_rank = ", kids_rank))
+  parents_rank_black <- kids_rank
+}
+
+
+
+
+```
+Using the all-race/gender model, white and black inter-generational mobility outcomes converge around gen 7 at a rank of about 51.3. But we know that this is incorrect; let's find the steady state prediction for Black and Hispanic children using their respective rank-rank models:
+
+```{r q1v2}
+
+#Steady state for Black children
+generations <- seq(1,7,1)
+parents_rank_black = 32.7
+
+#black gen for loop
+for(i in generations){ 
+  kids_rank <- 25.4 + 0.28 * parents_rank_black
+  print(paste0("In generation ", i, ", parent_rank = ", parents_rank_black, ", child_rank = ", kids_rank))
+  parents_rank_black <- kids_rank
+}
+
+#Steady state for Hispanic children
+parents_rank_hisp = 36.17
+for(i in generations){ 
+  kids_rank <- 36.14 + 0.26 * parents_rank_hisp
+  print(paste0("In generation ", i, ", parent_rank = ", parents_rank_hisp, ", child_rank = ", kids_rank))
+  parents_rank_hisp <- kids_rank
+}
+
 ```
 
-## Including Plots
+The steady state prediction for Black children is around 35.27 and for Hispanic children, 48.83.
 
-You can also embed plots, for example:
+***Question 2***
+Cross-validation helps us avoid the overfit problem by addressing the bias-variance tradeoff in machine learning models. More complex models will eventually fit the noise of the training data, which causes the overfit problem. Cross-validation addresses that by evaluating a model's performance with different sets of training data taken from the original dataset. We can cross-validate a portion of the training data to find the optimal model complexity that minimizes RMSPE and over-fitting. 
 
-```{r pressure, echo=FALSE}
-plot(pressure)
+```{r q3}
+
+
+
+
 ```
 
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+
+
+
+
+
