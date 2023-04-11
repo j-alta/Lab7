@@ -91,13 +91,104 @@ Cross-validation helps us avoid the overfit problem by addressing the bias-varia
 
 ```{r q3}
 
+#Implementing 5-fold cross-validation using two predictors
 
+#Store predictor variables which all start with P_*
+vars <- colnames(training[,grep("^[P_]", names(training))])
+vars
+
+#Create a training data frame with just predictors P_* and kfr_pooled_pooled_p25
+training_subset <- subset(training, training==1, vars)
+training_subset$kfr_pooled_pooled_p25 <- training[training$training==1,]$kfr_pooled_pooled_p25
+
+#cross-validation
+n <- nrow(training_subset)
+K <- 5 
+B <- seq(1,20,1) 
+
+cv <- training_subset
+cv$foldid <- rep(1:K,each=ceiling(n/K))[sample(1:n)]
+OOS <- data.frame(fold=rep(NA,K*length(B) ), 
+                  squarederror=rep(NA,K*length(B) ), 
+                  maxdepth=rep(NA,K*length(B) )) 
+
+row <- 0
+
+for(i in B){ 
+  
+  for(k in 1:K){ 
+    
+    row <- row + 1
+    
+    cvtrain <- subset(cv, foldid != k) 
+    
+    cvfold <- subset(cv, foldid == k) 
+    
+    cvtree <- rpart(kfr_pooled_pooled_p25 ~ P_12 + P_80,
+                    data=cvtrain,
+                    maxdepth = c(i), 
+                    cp=0) 
+    
+    
+    predfull <- predict(cvtree, newdata=cvfold) 
+    
+    OOS$squarederror[row] <- sum((cvfold$kfr_pooled_pooled_p25 - predfull)^2) 
+    
+    OOS$maxdepth[row] <- i
+    
+    OOS$fold[row] <- k 
+    
+  }
+  
+}
+
+OOS
+summary(OOS)
+
+ssr <- tapply(OOS$squarederror, OOS$maxdepth, sum)
+ssr <- as.data.frame(ssr)
+ssr$maxdepth <- seq(1,20,1)
+ssr
+
+ssr$rmse <- sqrt(ssr$ssr / nrow(training))
+
+ggplot(ssr, aes(x=maxdepth,y=rmse)) +
+  geom_point() +
+  geom_line() +
+  labs(y = "Cross Validation RMSPE",
+       x = "Tree Depth")
+
+cv_optimal_depth = ssr$maxdepth[which.min(ssr$rmse)]
+cv_optimal_depth
 
 
 ```
 
+***Question 3b***
+The optimal tree depth for this training dataset is 5
 
+***Question 3c***
+I am using the following two predictors: P_12 (Total Violent and Property Crimes Rate) and P_80 (Percent of Children Eligible for Free Lunch
+(Persons < 18 Years)). 
 
+```{r q3v2}
 
+#Using full training dataset to estimate tree of depth 5 
 
+tree <- rpart(kfr_pooled_pooled_p25 ~ P_23 + P_80, 
+                      data=training_subset, 
+                      maxdepth = cv_optimal_depth, 
+                      cp=0) 
+
+#visualize tree
+plot(tree, margin = 0.2)
+text(tree, cex = 0.5)
+
+#Calculate predictions for all rows in training sample
+y_train_predictions_tree <- predict(tree, newdata=training_subset)
+
+```
+
+***Question 4***
+Random forests improve upon decision trees in two distinct ways. First, they apply bagging to build a series of trees which are each trained on a subset of the original data. The average of each series' RMPSE is taken to determine the most accurate prediction model. Bagging averages across a large number of  trees to cancel out the training data noise and left with real signal instruction. The other way is through input randomization. This reduces the correlation between trees, which improves model accuracy.   
 
