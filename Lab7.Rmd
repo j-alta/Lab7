@@ -192,3 +192,102 @@ y_train_predictions_tree <- predict(tree, newdata=training_subset)
 ***Question 4***
 Random forests improve upon decision trees in two distinct ways. First, they apply bagging to build a series of trees which are each trained on a subset of the original data. The average of each series' RMPSE is taken to determine the most accurate prediction model. Bagging averages across a large number of  trees to cancel out the training data noise and left with real signal instruction. The other way is through input randomization. This reduces the correlation between trees, which improves model accuracy.   
 
+```{r q5}
+
+#Question 5
+#Random forest with at least 1000 trees bootsrap with P_12 and P_80
+smallforest <- randomForest(kfr_pooled_pooled_p25 ~ P_12 + P_80, 
+                               ntree=1000, 
+                               mtry=2,
+                               data=training_subset)
+smallforest
+
+y_train_predictions_smallforest <- predict(smallforest, newdata=training_subset, type="response")
+
+
+```
+
+```{r q6}
+
+#Question 6
+#Random forest with at least 1000 trees bootstrap with all predictor variables
+mobilityforest <- randomForest(kfr_pooled_pooled_p25 ~ ., 
+                               ntree=1000, 
+                               mtry=40,
+                               importance=TRUE, 
+                               data=training_subset)
+mobilityforest
+
+y_train_predictions_forest  <- predict(mobilityforest, newdata=training_subset, type="response")
+
+
+```
+```{r q7}
+
+#Determing the importance of each predictor
+
+importance(mobilityforest)
+varImpPlot(mobilityforest, type=1) 
+
+#type	is either 1 or 2, specifying the type of importance measure 
+#(1=mean decrease in accuracy, 2=mean decrease in node impurity)
+
+as.data.frame(importance(mobilityforest)) %>%
+arrange(desc(`%IncMSE`)) %>%
+head(10)
+
+```
+
+The most important predictors are P_56 (Mentally Unhealthy Days per Month (Persons 18 Years and Over)), P_37 (black share of the population in 2000), and P_85 (percentage of the population Roman Catholic)
+
+```{r q8}
+#Question 8
+#Dtermining the best model by RMSPE for each of the three models
+
+p <- 3
+RMSPE <- matrix(0, p, 1)
+RMSPE[1] <- sqrt(mean((training_subset$kfr_pooled_pooled_p25 - y_train_predictions_tree)^2, na.rm=TRUE))
+RMSPE[2] <- sqrt(mean((training_subset$kfr_pooled_pooled_p25 - y_train_predictions_smallforest)^2, na.rm=TRUE))
+RMSPE[3] <- sqrt(mean((training_subset$kfr_pooled_pooled_p25 - y_train_predictions_forest)^2, na.rm=TRUE))
+
+#Display a table of the results
+data.frame(RMSPE, method = c("Tree", "Small RF", "Large RF"))  
+
+
+```
+
+The large random forest model (of 1000 trees and including all 120+ predictor variables) performed the best, as it has the lowest RMSPE.
+
+```{r q9}
+
+# Question9
+#Applying models to lockbox data - which model perfoms the best with actual social mobility data?
+
+
+#Merge with truth to evaluate predictions. 
+atlas <- left_join(lockbox, training , by="geoid")
+
+#Separate test data set as a separate data frame
+test <- subset(atlas, training==0)
+
+#Get predictions for test data
+y_test_predictions_tree <- predict(tree, newdata=test)
+y_test_predictions_smallforest <- predict(smallforest, newdata=test, type="response")
+y_test_predictions_forest  <- predict(mobilityforest, newdata=test, type="response")
+
+#Calculate RMSPE for test data
+p <- 3
+OOS_RMSPE <- matrix(0, p, 1)
+OOS_RMSPE[1] <- sqrt(mean((test$kfr_actual - y_test_predictions_tree)^2, na.rm=TRUE))
+OOS_RMSPE[2] <- sqrt(mean((test$kfr_actual - y_test_predictions_smallforest)^2, na.rm=TRUE))
+OOS_RMSPE[3] <- sqrt(mean((test$kfr_actual - y_test_predictions_forest)^2, na.rm=TRUE))
+
+# Display table of results
+data.frame(OOS_RMSPE, method = c("Tree", "Small RF", "Large RF"))  
+
+```
+
+Once again, the large random forest model performs the best, albeit with a higher error than when using it with the training data.
+
+
+
